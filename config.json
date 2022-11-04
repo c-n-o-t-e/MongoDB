@@ -1,0 +1,12 @@
+{
+  "MARKETS": {
+    "WETH/BETA": "0x46bFD50c51061fc0c60400d291c0C7296E6D465b",
+    "WETH/USDC": "0x242aeE5D1617f253155C9D04549373790A7122ce",
+    "WETH/THETA": "0x8b3317d917574569feb19e4e204bac3b06d63f71"
+  },
+
+  "CORE_CONTRACTS": {
+    "overlayV1StateContractAddress": "0xc1a0426ed3a68efadb702b28115b491f8a4f958d",
+    "overlayV1TokenContractAddress": "0xdBD4a09ac1962F028390C53F4a4d126F5E13baEe"
+  }
+}
