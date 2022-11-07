@@ -235,7 +235,6 @@ setInterval(async function () {
     await getPositionsInMarkets(eventLog, markets, i, costData);
     await getTransfersInMarkets(markets, i);
   }
-  console.log("done");
 }, 30000);
 
 function getDateAndTime() {
