@@ -19,5 +19,5 @@ const uPnLSchema = new mongoose.Schema({
   },
 });
 
-// connect uPnLSchema with the "positions" collection
+// connect uPnLSchema with the "upnls" collection
 module.exports = mongoose.model("uPnL", uPnLSchema);

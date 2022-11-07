@@ -19,5 +19,5 @@ const transferSchema = new mongoose.Schema({
   },
 });
 
-// connect transferSchema with the "positions" collection
+// connect transferSchema with the "transfers" collection
 module.exports = mongoose.model("Transfer", transferSchema);

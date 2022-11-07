@@ -28,6 +28,7 @@ const network = {
     ),
 };
 
+const number = 1000000000000000000;
 const provider = ethers.getDefaultProvider(network);
 
 const marketContract = new ethers.Contract(
@@ -60,7 +61,7 @@ async function getPositionsInMarkets(eventLog, market, i, costData) {
   const count = [0, 0, 0, 0, 0];
 
   for (let y = 0; y < eventLog.length; y++) {
-    const collateral = Number(costData[y]) / 1e18;
+    const collateral = Number(costData[y]) / number;
     if (collateral > 0 && collateral <= 10) {
       count[0] += 1;
     } else if (collateral > 10 && collateral <= 20) {
@@ -128,8 +129,8 @@ async function getuPnLinMarket(market, eventLog, i, costData) {
   uPnL.create({
     market: market[i],
     date: getDateAndTime(),
-    totalUnrealizedProfit: totalProfit / 1e18,
-    totalUnrealizedLoss: totalLoss / 1e18,
+    totalUnrealizedProfit: totalProfit / number,
+    totalUnrealizedLoss: totalLoss / number,
   });
 }
 
@@ -163,8 +164,8 @@ async function getTransfersInMarkets(market, i) {
   transfer.create({
     market: market[i],
     date: getDateAndTime(),
-    totalMintedOVLInMarket: totalMintedInMarket / 1e18,
-    totalBurntOVLInMarket: totalBurntInMarket / 1e18,
+    totalMintedOVLInMarket: totalMintedInMarket / number,
+    totalBurntOVLInMarket: totalBurntInMarket / number,
   });
 }
 
@@ -188,11 +189,11 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
   builds.create({
     market: "ETH/USDC",
     date: getDateAndTime(),
-    capOI: capOI / 1e18,
-    userOI: userOI / 1e18,
+    capOI: capOI / number,
+    userOI: userOI / number,
     sender: sender,
-    collateralInOVL: collateral / 1e18,
-    percentageOfCapOiBought: percentageOfCapOiBought,
+    collateralInOVL: collateral / 1000000000000000000,
+    percentageOfCapOiBought: percentageOfCapOiBought / number,
   });
 });
 
