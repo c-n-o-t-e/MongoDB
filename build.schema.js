@@ -1,6 +1,14 @@
 const mongoose = require("mongoose");
 
 const buildSchema = new mongoose.Schema({
+  market: {
+    type: String,
+    required: true,
+  },
+  date: {
+    type: String,
+    required: true,
+  },
   capOI: {
     type: Number,
     required: true,

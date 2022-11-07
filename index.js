@@ -8,55 +8,59 @@ const { createServer } = require("http");
 
 const app = express();
 const server = createServer(app);
-const { MultiCall } = require("@indexed-finance/multicall");
-
+const uPnL = require("./uPnL.schema");
 const abi = require("./Abi/abi1.json");
 const abi2 = require("./Abi/abi2.json");
 const abi3 = require("./Abi/abi3.json");
+
 const builds = require("./build.schema");
 const position = require("./position.schema");
-const uPnL = require("./uPnL.schema");
 const transfer = require("./transfer.schema");
 const mongoDBUrl = `${process.env.MONGO_DB_URL}`;
+const multiCallAbi = require("./Abi/multiCall.json");
 
 const network = {
-  name: "goerli",
-  chainId: 5,
+  name: "Ethereum Mainnet",
+  chainId: 1,
   _defaultProvider: (providers) =>
     new providers.JsonRpcProvider(
-      "https://goerli.infura.io/v3/429eb57532b54560b1d4cc4201724bf0"
+      `https://eth-mainnet.alchemyapi.io/v2/${process.env.ID}`
     ),
 };
 
 const provider = ethers.getDefaultProvider(network);
 
 const marketContract = new ethers.Contract(
-  config.MARKETS["WETH/BETA"],
+  config.MARKETS["ETH/USDC"],
   abi,
   provider
 );
 
+const multiCall = new ethers.Contract(
+  config.MULTI_CALL_CONTRACT_ADDRESS,
+  multiCallAbi,
+  provider
+);
+
 const stateContract = new ethers.Contract(
-  config.CORE_CONTRACTS.overlayV1StateContractAddress,
+  config.CORE_CONTRACTS.OVERLAY_V1_STATE_CONTRACT_ADDRESS,
   abi2,
   provider
 );
 const tokenContract = new ethers.Contract(
-  config.CORE_CONTRACTS.overlayV1TokenContractAddress,
+  config.CORE_CONTRACTS.OVERLAY_V1_TOKEN_CONTRACT_ADDRESS,
   abi3,
   provider
 );
 
 /**
- * Gets triggered when /positions with name of market pair is typed
- * on the supporting discord channel.
  * Returns the amount of OVL as collateral in different positions.
  */
-async function getPositionsInMarkets(eventLog, costData, market, i) {
-  let count = [0, 0, 0, 0, 0];
+async function getPositionsInMarkets(eventLog, market, i, costData) {
+  const count = [0, 0, 0, 0, 0];
 
   for (let y = 0; y < eventLog.length; y++) {
-    const collateral = Number(costData[1][y]) / 1e18;
+    const collateral = Number(costData[y]) / 1e18;
     if (collateral > 0 && collateral <= 10) {
       count[0] += 1;
     } else if (collateral > 10 && collateral <= 20) {
@@ -72,7 +76,7 @@ async function getPositionsInMarkets(eventLog, costData, market, i) {
 
   position.create({
     market: market[i],
-    date: new Date(),
+    date: getDateAndTime(),
     collateralInOVLBetween0and10: count[0],
     collateralInOVLBetween11and20: count[1],
     collateralInOVLBetween21and100: count[2],
@@ -82,51 +86,54 @@ async function getPositionsInMarkets(eventLog, costData, market, i) {
 }
 
 /**
- * Gets triggered when /uPnL with name of market pair is typed
- * on the supporting discord channel.
  * Returns the unrealized profit and loss of positions in a market.
  */
-async function getuPnLinMarket(market, eventLog, costData, i, multi) {
-  let totalProfit = 0;
+async function getuPnLinMarket(market, eventLog, i, costData) {
   let totalLoss = 0;
+  let totalProfit = 0;
 
+  const inputs = [];
   const inputs0 = [];
 
+  let abi = ["function value(address market, address owner, uint256 id)"];
+  let iface = new ethers.utils.Interface(abi);
+
   for (let z = 0; z < eventLog.length; z++) {
-    inputs0.push({
-      target: stateContract.address,
-      function: "value",
-      args: [
+    inputs.push(stateContract.address);
+
+    inputs0.push(
+      iface.encodeFunctionData("value", [
         `${config.MARKETS[market[i]]}`,
         `${eventLog[z].args[0]}`,
         `${eventLog[z].args[1]}`,
-      ],
-    });
+      ])
+    );
   }
 
-  const valueData = await multi.multiCall(abi2, inputs0);
+  const valueData = await multiCall.mul(inputs, inputs0);
 
   for (let w = 0; w < eventLog.length; w++) {
-    if (Number(valueData[1][w]) > Number(costData[1][w])) {
-      const profit = valueData[1][w] - costData[1][w];
+    const cost = Number(costData[w]);
+    const value = Number(valueData[w]);
+
+    if (value > cost) {
+      const profit = value - cost;
       totalProfit += profit;
     } else {
-      const loss = costData[1][w] - valueData[1][w];
+      const loss = cost - value;
       totalLoss += loss;
     }
   }
 
   uPnL.create({
     market: market[i],
-    date: new Date(),
-    totalProfit: totalProfit / 1e18,
-    totalLoss: totalLoss / 1e18,
+    date: getDateAndTime(),
+    totalUnrealizedProfit: totalProfit / 1e18,
+    totalUnrealizedLoss: totalLoss / 1e18,
   });
 }
 
 /**
- * Gets triggered when /transfers with name of market pair is typed
- * on the supporting discord channel.
  * Returns the total minted and burnt OVL in a market.
  */
 async function getTransfersInMarkets(market, i) {
@@ -145,31 +152,29 @@ async function getTransfersInMarkets(market, i) {
   let totalBurntInMarket = 0;
   let totalMintedInMarket = 0;
 
-  for (let i = 0; i < burntEventLog.length; i++) {
-    totalBurntInMarket += Number(burntEventLog[i].args[2]);
+  for (let r = 0; r < burntEventLog.length; r++) {
+    totalBurntInMarket += Number(burntEventLog[r].args[2]);
   }
 
-  for (let i = 0; i < mintedEventLog.length; i++) {
-    totalMintedInMarket += Number(mintedEventLog[i].args[2]);
+  for (let x = 0; x < mintedEventLog.length; x++) {
+    totalMintedInMarket += Number(mintedEventLog[x].args[2]);
   }
 
   transfer.create({
     market: market[i],
-    date: new Date(),
-    totalMintedInMarket: totalMintedInMarket / 1e18,
-    totalBurntInMarket: totalBurntInMarket / 1e18,
+    date: getDateAndTime(),
+    totalMintedOVLInMarket: totalMintedInMarket / 1e18,
+    totalBurntOVLInMarket: totalBurntInMarket / 1e18,
   });
 }
 
 /**
  * Listens to the build function event,
- * sends a message of %CapOI bought in new position
- * to a supporting discord channel
+ * calculates the %CapOI bought in new position
  */
 marketContract.on("Build", async (sender, positionId, userOI) => {
-  console.log("starting");
-
   const marketCapOi = await stateContract.capOi(marketContract.address);
+
   const collateral = await stateContract.cost(
     marketContract.address,
     sender,
@@ -181,6 +186,8 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
   const percentageOfCapOiBought = percentage / capOI;
 
   builds.create({
+    market: "ETH/USDC",
+    date: getDateAndTime(),
     capOI: capOI / 1e18,
     userOI: userOI / 1e18,
     sender: sender,
@@ -189,55 +196,66 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
   });
 });
 
-let blockNumberThreshold = 0;
+// runs every 30 seconds
+setInterval(async function () {
+  // Current markets on mainnet
+  const markets = ["ETH/USDC"];
 
-provider.on("block", async () => {
-  if (blockNumberThreshold < provider.blockNumber) {
-    console.log("working");
-    console.log(blockNumberThreshold);
-    console.log(provider.blockNumber);
-    let market = ["WETH/USDC", "WETH/THETA"];
+  for (let i = 0; i < markets.length; i++) {
+    const marketContract = new ethers.Contract(
+      config.MARKETS[markets[i]],
+      abi,
+      provider
+    );
 
-    for (let i = 0; i < market.length; i++) {
-      const marketContract = new ethers.Contract(
-        config.MARKETS[market[i]],
-        abi,
-        provider
+    const filter = marketContract.filters.Build();
+    const eventLog = await marketContract.queryFilter(filter, 0);
+
+    const inputs = [];
+    const inputs0 = [];
+
+    let abi00 = ["function cost(address market, address owner, uint256 id)"];
+    let iface = new ethers.utils.Interface(abi00);
+
+    for (let e = 0; e < eventLog.length; e++) {
+      inputs.push(
+        iface.encodeFunctionData("cost", [
+          `${config.MARKETS[markets[i]]}`,
+          `${eventLog[e].args[0]}`,
+          `${eventLog[e].args[1]}`,
+        ])
       );
 
-      const filter = marketContract.filters.Build();
-      const eventLog = await marketContract.queryFilter(
-        filter,
-        blockNumberThreshold
-      );
-
-      const multi = new MultiCall(provider);
-      const inputs = [];
-
-      for (let e = 0; e < eventLog.length; e++) {
-        inputs.push({
-          target: stateContract.address,
-          function: "cost",
-          args: [
-            `${config.MARKETS[market[i]]}`,
-            `${eventLog[e].args[0]}`,
-            `${eventLog[e].args[1]}`,
-          ],
-        });
-      }
-
-      const costData = await multi.multiCall(abi2, inputs);
-
-      await getuPnLinMarket(market, eventLog, costData, i, multi);
-      await getPositionsInMarkets(eventLog, costData, market, i);
-      await getTransfersInMarkets(market, i);
-
-      console.log("transfer");
+      inputs0.push(stateContract.address);
     }
 
-    blockNumberThreshold = provider.blockNumber + 5;
+    const costData = await multiCall.mul(inputs0, inputs);
+
+    await getuPnLinMarket(markets, eventLog, i, costData);
+    await getPositionsInMarkets(eventLog, markets, i, costData);
+    await getTransfersInMarkets(markets, i);
   }
-});
+  console.log("done");
+}, 30000);
+
+function getDateAndTime() {
+  const currentdate = new Date();
+  const datetime =
+    "Last Sync: " +
+    currentdate.getDate() +
+    "/" +
+    (currentdate.getMonth() + 1) +
+    "/" +
+    currentdate.getFullYear() +
+    " @ " +
+    currentdate.getHours() +
+    ":" +
+    currentdate.getMinutes() +
+    ":" +
+    currentdate.getSeconds();
+
+  return datetime;
+}
 
 mongoose.connection.once("open", () => {
   console.log("connection ready");

@@ -6,14 +6,14 @@ const uPnLSchema = new mongoose.Schema({
     required: true,
   },
   date: {
-    type: Date,
+    type: String,
     required: true,
   },
-  totalProfit: {
+  totalUnrealizedProfit: {
     type: Number,
     required: true,
   },
-  totalLoss: {
+  totalUnrealizedLoss: {
     type: Number,
     required: true,
   },

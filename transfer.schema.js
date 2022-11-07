@@ -6,14 +6,14 @@ const transferSchema = new mongoose.Schema({
     required: true,
   },
   date: {
-    type: Date,
+    type: String,
     required: true,
   },
-  totalMintedInMarket: {
+  totalMintedOVLInMarket: {
     type: Number,
     required: true,
   },
-  totalBurntInMarket: {
+  totalBurntOVLInMarket: {
     type: Number,
     required: true,
   },
