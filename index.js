@@ -17,7 +17,7 @@ const builds = require("./build.schema");
 const position = require("./position.schema");
 const transfer = require("./transfer.schema");
 const mongoDBUrl = `${process.env.MONGO_DB_URL}`;
-const multiCallAbi = require("./Abi/multiCall.json");
+const multiCallAbi = require("./Abi/multicall.json");
 
 const network = {
   name: "Ethereum Mainnet",
@@ -181,7 +181,8 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
     sender,
     positionId
   );
-
+  506731823004566328312010517447015;
+  317436653011316399553182769903;
   const capOI = marketCapOi.toString();
   const percentage = userOI * 100;
   const percentageOfCapOiBought = percentage / capOI;
@@ -189,10 +190,10 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
   builds.create({
     market: "ETH/USDC",
     date: getDateAndTime(),
-    capOI: capOI / number,
-    userOI: userOI / number,
+    capOI: Number(capOI) / number,
+    userOI: Number(userOI) / number,
     sender: sender,
-    collateralInOVL: collateral / 1000000000000000000,
+    collateralInOVL: Number(collateral) / 1000000000000000000,
     percentageOfCapOiBought: percentageOfCapOiBought / number,
   });
 });
