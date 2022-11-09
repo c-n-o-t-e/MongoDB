@@ -181,8 +181,7 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
     sender,
     positionId
   );
-  506731823004566328312010517447015;
-  317436653011316399553182769903;
+
   const capOI = marketCapOi.toString();
   const percentage = userOI * 100;
   const percentageOfCapOiBought = percentage / capOI;
@@ -190,11 +189,11 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
   builds.create({
     market: "ETH/USDC",
     date: getDateAndTime(),
-    capOI: Number(capOI) / number,
-    userOI: Number(userOI) / number,
+    capOI: Number(capOI) / 1e30,
+    userOI: Number(userOI) / 1e30,
     sender: sender,
-    collateralInOVL: Number(collateral) / 1000000000000000000,
-    percentageOfCapOiBought: percentageOfCapOiBought / number,
+    collateralInOVL: Number(collateral) / 1e30,
+    percentageOfCapOiBought: percentageOfCapOiBought / 1e30,
   });
 });
 
@@ -270,3 +269,5 @@ server.listen(8080, async function () {
   await mongoose.connect(mongoDBUrl);
   console.log("Listening on http://0.0.0.0:8080");
 });
+
+mongoexport --uri mongodb+srv://overlayData:overlay@cluster0.7nwxoak.mongodb.net/project0 --collection transfer --type csv --out text.csv
