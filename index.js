@@ -269,5 +269,3 @@ server.listen(8080, async function () {
   await mongoose.connect(mongoDBUrl);
   console.log("Listening on http://0.0.0.0:8080");
 });
-
-mongoexport --uri mongodb+srv://overlayData:overlay@cluster0.7nwxoak.mongodb.net/project0 --collection transfer --type csv --out text.csv
