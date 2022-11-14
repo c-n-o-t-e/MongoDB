@@ -192,7 +192,7 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
     capOI: Number(capOI) / 1e30,
     userOI: Number(userOI) / 1e30,
     sender: sender,
-    collateralInOVL: Number(collateral) / 1e30,
+    collateralInOVL: Number(collateral) / 1e18,
     percentageOfCapOiBought: percentageOfCapOiBought,
   });
 });
