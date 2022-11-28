@@ -219,8 +219,8 @@ marketContract1.on("Build", async (sender, positionId, userOI) => {
   builds.create({
     market: "WBTC/USDC",
     date: getDateAndTime(),
-    capOI: Number(capOI) / 1e30,
-    userOI: Number(userOI) / 1e30,
+    capOI: Number(capOI) / 1e20,
+    userOI: Number(userOI) / 1e20,
     sender: sender,
     collateralInOVL: Number(collateral) / 1e18,
     percentageOfCapOiBought: percentageOfCapOiBought,
