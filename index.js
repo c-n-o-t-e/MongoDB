@@ -31,8 +31,14 @@ const network = {
 const number = 1000000000000000000;
 const provider = ethers.getDefaultProvider(network);
 
-const marketContract = new ethers.Contract(
+const marketContract0 = new ethers.Contract(
   config.MARKETS["ETH/USDC"],
+  abi,
+  provider
+);
+
+const marketContract1 = new ethers.Contract(
+  config.MARKETS["WBTC/USDC"],
   abi,
   provider
 );
@@ -173,11 +179,11 @@ async function getTransfersInMarkets(market, i) {
  * Listens to the build function event,
  * calculates the %CapOI bought in new position
  */
-marketContract.on("Build", async (sender, positionId, userOI) => {
-  const marketCapOi = await stateContract.capOi(marketContract.address);
+marketContract0.on("Build", async (sender, positionId, userOI) => {
+  const marketCapOi = await stateContract.capOi(marketContract0.address);
 
   const collateral = await stateContract.cost(
-    marketContract.address,
+    marketContract0.address,
     sender,
     positionId
   );
@@ -197,10 +203,34 @@ marketContract.on("Build", async (sender, positionId, userOI) => {
   });
 });
 
+marketContract1.on("Build", async (sender, positionId, userOI) => {
+  const marketCapOi = await stateContract.capOi(marketContract1.address);
+
+  const collateral = await stateContract.cost(
+    marketContract1.address,
+    sender,
+    positionId
+  );
+
+  const capOI = marketCapOi.toString();
+  const percentage = userOI * 100;
+  const percentageOfCapOiBought = percentage / capOI;
+
+  builds.create({
+    market: "WBTC/USDC",
+    date: getDateAndTime(),
+    capOI: Number(capOI) / 1e30,
+    userOI: Number(userOI) / 1e30,
+    sender: sender,
+    collateralInOVL: Number(collateral) / 1e18,
+    percentageOfCapOiBought: percentageOfCapOiBought,
+  });
+});
+
 // runs every 30 seconds
 setInterval(async function () {
   // Current markets on mainnet
-  const markets = ["ETH/USDC"];
+  const markets = ["ETH/USDC", "WBTC/USDC"];
 
   for (let i = 0; i < markets.length; i++) {
     const marketContract = new ethers.Contract(
@@ -241,7 +271,6 @@ setInterval(async function () {
 function getDateAndTime() {
   const currentdate = new Date();
   const datetime =
-    "Last Sync: " +
     currentdate.getDate() +
     "/" +
     (currentdate.getMonth() + 1) +
