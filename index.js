@@ -16,6 +16,7 @@ const abi3 = require("./Abi/abi3.json");
 const builds = require("./build.schema");
 const position = require("./position.schema");
 const transfer = require("./transfer.schema");
+const liquidity = require("./liquidity.schema");
 const mongoDBUrl = `${process.env.MONGO_DB_URL}`;
 const multiCallAbi = require("./Abi/multicall.json");
 
@@ -32,7 +33,7 @@ const number = 1000000000000000000;
 const provider = ethers.getDefaultProvider(network);
 
 const marketContract0 = new ethers.Contract(
-  config.MARKETS["ETH/USDC"],
+  config.MARKETS["WETH/USDC"],
   abi,
   provider
 );
@@ -63,7 +64,7 @@ const tokenContract = new ethers.Contract(
 /**
  * Returns the amount of OVL as collateral in different positions.
  */
-async function getPositionsInMarkets(eventLog, market, i, costData) {
+async function getPositionsInMarkets(eventLog, market, costData) {
   const count = [0, 0, 0, 0, 0];
 
   for (let y = 0; y < eventLog.length; y++) {
@@ -81,8 +82,10 @@ async function getPositionsInMarkets(eventLog, market, i, costData) {
     }
   }
 
+  console.log(count[0], count[1], count[2], count[3], count[4], "count");
+
   position.create({
-    market: market[i],
+    market: market,
     date: getDateAndTime(),
     collateralInOVLBetween0and10: count[0],
     collateralInOVLBetween11and20: count[1],
@@ -95,7 +98,7 @@ async function getPositionsInMarkets(eventLog, market, i, costData) {
 /**
  * Returns the unrealized profit and loss of positions in a market.
  */
-async function getuPnLinMarket(market, eventLog, i, costData) {
+async function getuPnLinMarket(market, eventLog, costData) {
   let totalLoss = 0;
   let totalProfit = 0;
 
@@ -110,7 +113,7 @@ async function getuPnLinMarket(market, eventLog, i, costData) {
 
     inputs0.push(
       iface.encodeFunctionData("value", [
-        `${config.MARKETS[market[i]]}`,
+        `${config.MARKETS[market]}`,
         `${eventLog[z].args[0]}`,
         `${eventLog[z].args[1]}`,
       ])
@@ -133,7 +136,7 @@ async function getuPnLinMarket(market, eventLog, i, costData) {
   }
 
   uPnL.create({
-    market: market[i],
+    market: market,
     date: getDateAndTime(),
     totalUnrealizedProfit: totalProfit / number,
     totalUnrealizedLoss: totalLoss / number,
@@ -143,15 +146,15 @@ async function getuPnLinMarket(market, eventLog, i, costData) {
 /**
  * Returns the total minted and burnt OVL in a market.
  */
-async function getTransfersInMarkets(market, i) {
+async function getTransfersInMarkets(market) {
   const filter1 = tokenContract.filters.Transfer(
     ethers.constants.AddressZero,
-    config.MARKETS[market[i]]
+    config.MARKETS[market]
   );
   const mintedEventLog = await tokenContract.queryFilter(filter1, 0);
 
   const filter2 = tokenContract.filters.Transfer(
-    config.MARKETS[market[i]],
+    config.MARKETS[market],
     ethers.constants.AddressZero
   );
   const burntEventLog = await tokenContract.queryFilter(filter2, 0);
@@ -168,11 +171,48 @@ async function getTransfersInMarkets(market, i) {
   }
 
   transfer.create({
-    market: market[i],
+    market: market,
     date: getDateAndTime(),
     totalMintedOVLInMarket: totalMintedInMarket / number,
     totalBurntOVLInMarket: totalBurntInMarket / number,
   });
+}
+
+async function checkLiquidity(pool) {
+  const abi = [
+    {
+      inputs: [],
+      name: "liquidity",
+      outputs: [{ internalType: "uint128", name: "", type: "uint128" }],
+      stateMutability: "view",
+      type: "function",
+    },
+  ];
+
+  const poolContract = new ethers.Contract(
+    config.UNISWAP_POOLS[pool],
+    abi,
+    provider
+  );
+
+  const currentLiquidity = Number(await poolContract.liquidity());
+  console.log(currentLiquidity);
+
+  const filter = { market: pool };
+  const update = { currentLiquidity: currentLiquidity };
+
+  doc = await liquidity.findOne(filter);
+
+  if (doc == null) {
+    await liquidity.create({
+      market: pool,
+      currentLiquidity: currentLiquidity,
+    });
+    return;
+  }
+
+  if (doc.currentLiquidity != currentLiquidity)
+    await liquidity.findOneAndUpdate(filter, update);
 }
 
 /**
@@ -193,7 +233,7 @@ marketContract0.on("Build", async (sender, positionId, userOI) => {
   const percentageOfCapOiBought = percentage / capOI;
 
   builds.create({
-    market: "ETH/USDC",
+    market: "WETH/USDC",
     date: getDateAndTime(),
     capOI: Number(capOI) / 1e30,
     userOI: Number(userOI) / 1e30,
@@ -230,7 +270,7 @@ marketContract1.on("Build", async (sender, positionId, userOI) => {
 // runs every 30 seconds
 setInterval(async function () {
   // Current markets on mainnet
-  const markets = ["ETH/USDC", "WBTC/USDC"];
+  const markets = ["WETH/USDC", "WBTC/USDC"];
 
   for (let i = 0; i < markets.length; i++) {
     const marketContract = new ethers.Contract(
@@ -262,11 +302,12 @@ setInterval(async function () {
 
     const costData = await multiCall.mul(inputs0, inputs);
 
-    await getuPnLinMarket(markets, eventLog, i, costData);
-    await getPositionsInMarkets(eventLog, markets, i, costData);
-    await getTransfersInMarkets(markets, i);
+    await getuPnLinMarket(markets[i], eventLog, costData);
+    await getPositionsInMarkets(eventLog, markets[i], costData);
+    await getTransfersInMarkets(markets[i]);
+    // await checkLiquidity(markets[i]);
   }
-}, 30000);
+}, 40000);
 
 function getDateAndTime() {
   const currentdate = new Date();
